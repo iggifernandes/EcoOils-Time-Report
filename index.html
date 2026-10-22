@@ -1,0 +1,589 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>[hidden]{display:none!important}body{margin:0}</style></head><body><title>Iggy Timesheet</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap">
+<style>
+/* Layout: one narrow column, header with version over language toggle, tabs, cycle list of day rows that expand in place. Shell palette: yellow accent, red for warnings, warm greys. */
+:root{
+  --bg:#ffffff; --panel:#f6f5f1; --line:#e3e1da; --fg:#1d1d1b; --mute:#6c6b65;
+  --accent:#fbce07; --accent-ink:#1d1d1b; --red:#dd1d21; --ok:#2b7a4b; --warn:#a86a00; --warn-bg:#fff4d6; --sel:#fff9dc;
+  --f-body:'Jost',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141413; --panel:#1e1e1c; --line:#33332f; --fg:#efeee9; --mute:#a09f97;
+  --accent:#fbce07; --accent-ink:#1d1d1b; --red:#ff5c5f; --ok:#58c185; --warn:#f0b74a; --warn-bg:#3a2f12; --sel:#2a2710; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141413; --panel:#1e1e1c; --line:#33332f; --fg:#efeee9; --mute:#a09f97;
+  --accent:#fbce07; --accent-ink:#1d1d1b; --red:#ff5c5f; --ok:#58c185; --warn:#f0b74a; --warn-bg:#3a2f12; --sel:#2a2710; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.4;margin:0;
+  padding-block:20px 90px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+#app{max-width:860px;margin:0 auto}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+h1{font-weight:300;text-transform:uppercase;letter-spacing:.28em;font-size:22px;margin:0;color:var(--mute)}
+.sub{color:var(--mute);font-size:13px;margin-top:4px}
+.ver-wrap{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:none}
+.ver{font-size:11px;letter-spacing:.12em;color:var(--mute)}
+.lang{display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.lang button{border:0;background:none;padding:3px 9px;font-size:12px;letter-spacing:.06em;color:var(--mute)}
+.lang button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow-x:auto}
+.tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:9px 10px;font-size:14px;letter-spacing:.04em;color:var(--mute);white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent);font-weight:500}
+.cyc-head{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;margin-bottom:10px}
+.cyc-head .mid{text-align:center;min-width:0}
+.cyc-head .lbl{font-size:18px;font-weight:500}
+.nav{border:1px solid var(--line);background:var(--panel);width:40px;height:40px;border-radius:4px;font-size:18px}
+.chip{display:inline-block;font-size:12px;padding:2px 9px;border-radius:99px;background:var(--panel);border:1px solid var(--line);margin-top:4px}
+.chip.ok{color:var(--ok);border-color:var(--ok)}.chip.bad{color:var(--red);border-color:var(--red)}.chip.warn{color:var(--warn);border-color:var(--warn)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:4px;overflow:hidden;margin-bottom:12px}
+.stats div{background:var(--panel);padding:9px 12px}
+.stats b{display:block;font-size:22px;font-weight:500;font-variant-numeric:tabular-nums}
+.stats span{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.stats .bal b{color:var(--fg)} .stats .neg b{color:var(--red)}
+.banner{background:var(--warn-bg);color:var(--fg);border-left:4px solid var(--accent);padding:10px 12px;border-radius:4px;margin-bottom:12px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--panel);padding:8px 14px;border-radius:4px;font-size:14px}
+.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.btn.dng{color:var(--red);border-color:var(--red);background:none}
+.btn.sm{padding:4px 10px;font-size:13px}
+.days{border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.day{border-bottom:1px solid var(--line);background:var(--bg)}
+.day:last-child{border-bottom:0}
+.day.open{background:var(--sel)}
+.dhead{display:grid;grid-template-columns:54px 1fr auto;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;padding:9px 12px;border-left:4px solid transparent}
+.day.attn .dhead{border-left-color:var(--accent)}
+.day.off .dhead{color:var(--mute)}
+.dnum{font-size:20px;font-weight:500;line-height:1;font-variant-numeric:tabular-nums}
+.dnum small{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin-top:3px;font-weight:400}
+.dnum.we small{color:var(--red)}
+.dmain{min-width:0}.dmain b{font-weight:500;display:block;overflow-wrap:anywhere}
+.dmain i{font-style:normal;font-size:13px;color:var(--mute);font-variant-numeric:tabular-nums}
+.tag{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);border-radius:3px;padding:0 5px;margin-left:6px;color:var(--mute)}
+.cred{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;padding:2px 8px;border-radius:3px;white-space:nowrap}
+.cred.plus{background:var(--accent);color:var(--accent-ink)}.cred.minus{border:1px solid var(--red);color:var(--red)}
+.edit{padding:4px 12px 14px 16px;display:grid;gap:12px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{border:1px solid var(--line);background:var(--bg);border-radius:4px;padding:6px 11px;font-size:13.5px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+label.f{display:grid;gap:3px;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);min-width:0}
+label.f input,label.f select,label.f textarea{font-size:15px;text-transform:none;letter-spacing:0;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:7px 9px;min-width:0;width:100%}
+label.ck{display:flex;gap:8px;align-items:center;font-size:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.warnline{color:var(--red);font-size:13px}
+.note{color:var(--mute);font-size:13px}
+.panel{border:1px solid var(--line);border-radius:4px;padding:14px;background:var(--panel);margin-bottom:14px;display:grid;gap:12px}
+.panel h2{margin:0;font-size:13px;letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--mute)}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:4px;background:var(--bg)}
+table.t{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+table.t th,table.t td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+table.t th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);font-weight:500;background:var(--panel)}
+table.t tr.clk{cursor:pointer}table.t tr.clk:hover{background:var(--sel)}
+.big{font-size:52px;font-weight:300;line-height:1;font-variant-numeric:tabular-nums}
+.sendbar{position:fixed;left:0;right:0;bottom:0;padding:10px max(16px,env(safe-area-inset-left,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-right,0px));background:var(--bg);border-top:1px solid var(--line);z-index:5}
+.sendbar .in{max-width:860px;margin:0 auto;display:flex;gap:10px;justify-content:space-between;align-items:center}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:4px;font-size:14px;z-index:9;max-width:90vw}
+.prev td,.prev th{white-space:nowrap}.prev{padding:12px;background:#fff;color:#000;border:1px solid var(--line);border-radius:4px;overflow-x:auto;font-family:Calibri,Arial,sans-serif;font-size:14px}
+textarea{resize:vertical}
+@media (max-width:480px){h1{font-size:18px;letter-spacing:.2em}.big{font-size:44px}}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style>
+<div id="app"></div>
+<div id="toast" class="toast" hidden></div>
+<script>
+const SEED={"days":{"2025-04-23":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-04-24":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-04-25":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-04-26":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-04-27":{"t":"off","lbl":"WORK OFF","h":1},"2025-04-28":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-04-29":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-04-30":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-01":{"t":"off","lbl":"PH - Workers Day","h":1},"2025-05-02":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-03":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-05-04":{"t":"off","lbl":"WORK OFF","h":1},"2025-05-05":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-06":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-07":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-08":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-09":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-10":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-05-11":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-05-12":{"t":"work","in":"8:00","out":"17:30","lbl":"PH - Wesak Day","cr":1.0,"h":1},"2025-05-13":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-14":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-15":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-16":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-17":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-05-18":{"t":"off","lbl":"WORK OFF","h":1},"2025-05-19":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-20":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-21":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-22":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-23":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-24":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-05-25":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-05-26":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-27":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-28":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-29":{"t":"off","lbl":"PH - Ascension Day of Jesus","h":1},"2025-05-30":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-05-31":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-06-01":{"t":"work","in":"8:00","out":"17:30","lbl":"Working + PH Pancasila Birthday","note":"Working","cr":1.0,"h":1},"2025-06-02":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","cr":1.0,"h":1},"2025-06-03":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-06-04":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-06-05":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-06-06":{"t":"off","lbl":"WORK OFF","h":1},"2025-06-07":{"t":"off","lbl":"PH -Hari Raya Qurban","cr":1.0,"h":1},"2025-06-08":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-06-09":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-06-10":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-06-11":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-06-12":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-06-13":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-06-14":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-06-15":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-06-16":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-06-17":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-06-18":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-06-19":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-06-20":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-06-21":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-06-22":{"t":"off","lbl":"WORK OFF","h":1},"2025-06-23":{"t":"sick","lbl":"SL - Sick Leave","h":1},"2025-06-24":{"t":"sick","lbl":"SL - Sick Leave","h":1},"2025-06-25":{"t":"sick","lbl":"SL - Sick Leave","h":1},"2025-06-26":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-06-27":{"t":"work","in":"8:00","out":"17:30","lbl":"PH - Awal Muharam (Maal Hijrah)","cr":1.0,"h":1},"2025-06-28":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-06-29":{"t":"off","lbl":"WORK OFF","h":1},"2025-06-30":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-07-01":{"t":"other","lbl":"OFF - Visite to Consulate General of India Medan","h":1},"2025-07-02":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-07-03":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-07-04":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-07-05":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","h":1},"2025-07-06":{"t":"off","lbl":"WORK OFF","h":1},"2025-07-07":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-07-08":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-07-09":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-07-10":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-07-11":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-07-12":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-07-13":{"t":"off","lbl":"WORK OFF","h":1},"2025-07-14":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-07-15":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-07-16":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-07-17":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-07-18":{"t":"other","lbl":"Immigration Visit - Siantar","h":1},"2025-07-19":{"t":"other","lbl":"Immigration Visit - Siantar","cr":1.0,"h":1},"2025-07-20":{"t":"other","lbl":"Sei Mangkei to Jakarta","cr":1.0,"h":1},"2025-07-21":{"t":"other","lbl":"Jakarta to Dumai","h":1},"2025-07-22":{"t":"work","in":"8:00","out":"17:30","lbl":"Dumai","h":1},"2025-07-23":{"t":"work","in":"8:00","out":"17:30","lbl":"Dumai","h":1},"2025-07-24":{"t":"work","in":"8:00","out":"17:30","lbl":"Dumai","h":1},"2025-07-25":{"t":"work","in":"8:00","out":"17:30","lbl":"Dumai","h":1},"2025-07-26":{"t":"off","lbl":"WORK OFF","h":1},"2025-07-27":{"t":"off","lbl":"WORK OFF","h":1},"2025-07-28":{"t":"work","in":"8:00","out":"17:30","lbl":"Dumai","h":1},"2025-07-29":{"t":"other","lbl":"Dumai to Medan","h":1},"2025-07-30":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-07-31":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-08-01":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-08-02":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-08-03":{"t":"off","lbl":"WORK OFF","h":1},"2025-08-04":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-08-05":{"t":"al","lbl":"2024 Annual Leave #01","h":1},"2025-08-06":{"t":"al","lbl":"2024 Annual Leave #02","h":1},"2025-08-07":{"t":"al","lbl":"2024 Annual Leave #03","h":1},"2025-08-08":{"t":"al","lbl":"2024 Annual Leave #04","h":1},"2025-08-09":{"t":"off","lbl":"WORK OFF","h":1},"2025-08-10":{"t":"off","lbl":"WORK OFF","h":1},"2025-08-11":{"t":"al","lbl":"2024 Annual Leave #05","h":1},"2025-08-12":{"t":"al","lbl":"2024 Annual Leave #06","h":1},"2025-08-13":{"t":"al","lbl":"2025 Annual Leave #01","h":1},"2025-08-14":{"t":"al","lbl":"2025 Annual Leave #02","h":1},"2025-08-15":{"t":"al","lbl":"2025 Annual Leave #03","h":1},"2025-08-16":{"t":"off","lbl":"WORK OFF","h":1},"2025-08-17":{"t":"off","lbl":"PH - Independence Day","h":1},"2025-08-18":{"t":"off","lbl":"WORK OFF","h":1},"2025-08-19":{"t":"al","lbl":"2025 Annual Leave #04","h":1},"2025-08-20":{"t":"comp","lbl":"TIME OFF","h":1},"2025-08-21":{"t":"comp","lbl":"TIME OFF","h":1},"2025-08-22":{"t":"comp","lbl":"TIME OFF","h":1},"2025-08-23":{"t":"off","lbl":"WORK OFF","h":1},"2025-08-24":{"t":"off","lbl":"WORK OFF","h":1},"2025-08-25":{"t":"comp","lbl":"TIME OFF","h":1},"2025-08-26":{"t":"comp","lbl":"TIME OFF","h":1},"2025-08-27":{"t":"comp","lbl":"TIME OFF","h":1},"2025-08-28":{"t":"comp","lbl":"TIME OFF","h":1},"2025-08-29":{"t":"comp","lbl":"TIME OFF","h":1},"2025-08-30":{"t":"off","lbl":"WORK OFF","h":1},"2025-08-31":{"t":"off","lbl":"WORK OFF","h":1},"2025-09-01":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-09-02":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-09-03":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-09-04":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-09-05":{"t":"work","in":"8:00","out":"17:30","lbl":"PH - Prophet Muhammad's Birthday","cr":1.0,"h":1},"2025-09-06":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-09-07":{"t":"off","lbl":"WORK OFF","h":1},"2025-09-08":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-09-09":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-09-10":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-09-11":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-09-12":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-09-13":{"t":"off","lbl":"WORK OFF","h":1},"2025-09-14":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-09-15":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-09-16":{"t":"other","lbl":"Leave","h":1},"2025-09-17":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-09-18":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-09-19":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2025-09-20":{"t":"work","in":"8:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-09-21":{"t":"off","lbl":"WORK OFF","h":1},"2025-09-22":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-09-23":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-09-24":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-09-25":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-09-26":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-09-27":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-09-28":{"t":"off","lbl":"WORK OFF","h":1},"2025-09-29":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-09-30":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-01":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-02":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-03":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-04":{"t":"off","lbl":"WORK OFF","h":1},"2025-10-05":{"t":"off","lbl":"WORK OFF","h":1},"2025-10-06":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-07":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-08":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-09":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-10":{"t":"work","in":"7:00","out":"22:00","lbl":"Sei Mangkei","cr":0.5,"h":1},"2025-10-11":{"t":"off","lbl":"WORK OFF","h":1},"2025-10-12":{"t":"work","in":"7:00","out":"12:30","lbl":"Sei Mangkei","note":"Working","cr":0.5,"h":1},"2025-10-13":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-14":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-15":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-16":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-17":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-18":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-10-19":{"t":"off","lbl":"WORK OFF","h":1},"2025-10-20":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-21":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-22":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-23":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-24":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-25":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-10-26":{"t":"off","lbl":"WORK OFF","h":1},"2025-10-27":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-28":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-29":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-30":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-10-31":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-01":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-11-02":{"t":"off","lbl":"WORK OFF","h":1},"2025-11-03":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-04":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-05":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-06":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-07":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-08":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-11-09":{"t":"off","lbl":"WORK OFF","h":1},"2025-11-10":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-11":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-12":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-13":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-14":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-15":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-11-16":{"t":"off","lbl":"WORK OFF","h":1},"2025-11-17":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-18":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-19":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-20":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-21":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-22":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2025-11-23":{"t":"off","lbl":"WORK OFF","h":1},"2025-11-24":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-25":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-26":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-27":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-28":{"t":"work","in":"7:00","out":"17:00","lbl":"Sei Mangkei","h":1},"2025-11-29":{"t":"off","lbl":"WORK OFF","h":1},"2025-11-30":{"t":"off","lbl":"WORK OFF","h":1},"2025-12-01":{"t":"al","lbl":"2025 Annual Leave #05","h":1},"2025-12-02":{"t":"al","lbl":"2025 Annual Leave #06","h":1},"2025-12-03":{"t":"al","lbl":"2025 Annual Leave #07","h":1},"2025-12-04":{"t":"al","lbl":"2025 Annual Leave #08","h":1},"2025-12-05":{"t":"al","lbl":"2025 Annual Leave #09","h":1},"2025-12-06":{"t":"off","lbl":"WORK OFF","h":1},"2025-12-07":{"t":"off","lbl":"WORK OFF","h":1},"2025-12-08":{"t":"al","lbl":"2025 Annual Leave #10","h":1},"2025-12-09":{"t":"comp","lbl":"COMP OFF - 20/10/2024","h":1},"2025-12-10":{"t":"comp","lbl":"COMP OFF - (2X0.5 - 02 Nov & 09 Nov 2024)","h":1},"2025-12-11":{"t":"comp","lbl":"COMP OFF - (03 Nov 2024)","h":1},"2025-12-12":{"t":"comp","lbl":"COMP OFF - (16 Nov 2024)","h":1},"2025-12-13":{"t":"off","lbl":"WORK OFF","h":1},"2025-12-14":{"t":"off","lbl":"WORK OFF","h":1},"2025-12-15":{"t":"comp","lbl":"COMP OFF - (23 Nov 2024)","h":1},"2025-12-16":{"t":"comp","lbl":"COMP OFF - (07 Dec 2024)","h":1},"2025-12-17":{"t":"comp","lbl":"COMP OFF - (2X0.5 - 10 & 11 Dec 2024)","h":1},"2025-12-18":{"t":"comp","lbl":"COMP OFF - (2X0.5 - 12 & 13 Dec 2024)","h":1},"2025-12-19":{"t":"comp","lbl":"COMP OFF - (14 Dec 2024)","h":1},"2025-12-20":{"t":"off","lbl":"WORK OFF","h":1},"2025-12-21":{"t":"off","lbl":"WORK OFF","h":1},"2025-12-22":{"t":"comp","lbl":"COMP OFF - (15 Dec 2024)","h":1},"2025-12-23":{"t":"comp","lbl":"COMP OFF - (12 Jan 2025)","h":1},"2025-12-24":{"t":"comp","lbl":"COMP OFF - (14 Jan 2025)","h":1},"2025-12-25":{"t":"off","lbl":"PH - Christmas Day","h":1},"2025-12-26":{"t":"comp","lbl":"COMP OFF - (08 Feb 2025)","h":1},"2025-12-27":{"t":"off","lbl":"WORK OFF","h":1},"2025-12-28":{"t":"off","lbl":"WORK OFF","h":1},"2025-12-29":{"t":"comp","lbl":"COMP OFF - (15 Feb 2025) - Nilai TOE","h":1},"2025-12-30":{"t":"comp","lbl":"COMP OFF - (02 Mar 2025)  - Nilai TOE","h":1},"2025-12-31":{"t":"comp","lbl":"COMP OFF - (06 Apr 2025)  - Nilai TOE","h":1},"2026-01-01":{"t":"off","lbl":"PH - New Year - Nilai TOE","h":1},"2026-01-02":{"t":"comp","lbl":"COMP OFF - (13 Apr 2025)  - Nilai TOE","h":1},"2026-01-03":{"t":"off","lbl":"WORK OFF - Nilai TOE","h":1},"2026-01-04":{"t":"off","lbl":"WORK OFF - Nilai TOE","h":1},"2026-01-05":{"t":"work","in":"7:00","out":"17:00","lbl":"Nilai - Nilai TOE","h":1},"2026-01-06":{"t":"work","in":"7:00","out":"17:00","lbl":"Nilai - Nilai TOE","h":1},"2026-01-07":{"t":"other","lbl":"Travel Back to Sei Mangkei","h":1},"2026-01-08":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2026-01-09":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2026-01-10":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-01-11":{"t":"off","lbl":"WORK OFF","h":1},"2026-01-12":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2026-01-13":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2026-01-14":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2026-01-15":{"t":"work","in":"7:30","out":"12:00","lbl":"Half Day","h":1},"2026-01-16":{"t":"work","in":"7:30","out":"17:00","lbl":"PH-Isra Mikraj Prophet Muhammad","cr":1.0,"h":1},"2026-01-17":{"t":"other","lbl":"Team Building (Medan)","cr":1.0,"h":1},"2026-01-18":{"t":"off","lbl":"WORK OFF","h":1},"2026-01-19":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2026-01-20":{"t":"work","in":"7:30","out":"17:00","lbl":"Sei Mangkei","h":1},"2026-01-21":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-01-22":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-01-23":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-01-24":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-01-25":{"t":"off","lbl":"WORK OFF","h":1},"2026-01-26":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-01-27":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-01-28":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-01-29":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-01-30":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-01-31":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-02-01":{"t":"off","lbl":"WORK OFF","h":1},"2026-02-02":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-03":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-04":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-05":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-06":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-07":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-02-08":{"t":"off","lbl":"WORK OFF","h":1},"2026-02-09":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-10":{"t":"work","in":"7:00","out":"22:00","lbl":"Sei Mangkei","cr":0.5,"h":1},"2026-02-11":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-12":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-13":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-14":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-02-15":{"t":"off","lbl":"WORK OFF","h":1},"2026-02-16":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-17":{"t":"work","in":"7:00","out":"17:30","lbl":"PH - Chinese New Year","cr":1.0,"h":1},"2026-02-18":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-19":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-20":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-21":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-02-22":{"t":"off","lbl":"WORK OFF","h":1},"2026-02-23":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-24":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-25":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-26":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-27":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-02-28":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-03-01":{"t":"off","lbl":"WORK OFF","h":1},"2026-03-02":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-03-03":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-03-04":{"t":"other","lbl":"Travel to Malaysia","h":1},"2026-03-05":{"t":"work","in":"7:30","out":"16:30","lbl":"Nilai","h":1},"2026-03-06":{"t":"work","in":"7:30","out":"16:30","lbl":"Nilai","h":1},"2026-03-07":{"t":"work","in":"7:50","out":"16:10","lbl":"Nilai","note":"Working","cr":1.0,"h":1},"2026-03-08":{"t":"work","in":"7:30","out":"16:30","lbl":"WORK OFF","note":"Working","h":1},"2026-03-09":{"t":"other","lbl":"Nilai","h":1},"2026-03-10":{"t":"work","in":"7:30","out":"16:30","lbl":"Nilai","h":1},"2026-03-11":{"t":"work","in":"7:30","out":"16:30","lbl":"Nilai","h":1},"2026-03-12":{"t":"other","lbl":"Travel to Medan","h":1},"2026-03-13":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-03-14":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-03-15":{"t":"off","lbl":"WORK OFF","h":1},"2026-03-16":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-03-17":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-03-18":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-03-19":{"t":"work","in":"7:00","out":"17:30","lbl":"PH - Hindu Holidays (Nyepi) 1948","cr":1.0,"h":1},"2026-03-20":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-03-21":{"t":"off","lbl":"PH - Hari Raya Puasa (Eid-ul-Fitri)*","h":1},"2026-03-22":{"t":"off","lbl":"PH - Hari Raya Puasa (2nd day)*","h":1},"2026-03-23":{"t":"work","in":"7:00","out":"17:30","lbl":"Replacement Rest Day","cr":1.0,"h":1},"2026-03-24":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-03-25":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-03-26":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-03-27":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-03-28":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","h":1},"2026-03-29":{"t":"off","lbl":"WORK OFF","h":1},"2026-03-30":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-03-31":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-01":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-02":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-03":{"t":"work","in":"7:00","out":"17:30","lbl":"PH - Good Friday","cr":1.0,"h":1},"2026-04-04":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-04-05":{"t":"off","lbl":"PH - Easter Day","h":1},"2026-04-06":{"t":"work","in":"7:00","out":"17:30","lbl":"Replacement Rest Day (Working)","cr":1.0,"h":1},"2026-04-07":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-08":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-09":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-10":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-11":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-04-12":{"t":"off","lbl":"WORK OFF","h":1},"2026-04-13":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-14":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-15":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-16":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-17":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-18":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-04-19":{"t":"off","lbl":"WORK OFF","h":1},"2026-04-20":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-21":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-22":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-23":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-24":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-25":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-04-26":{"t":"off","lbl":"WORK OFF","h":1},"2026-04-27":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-28":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-29":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-04-30":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-05-01":{"t":"off","lbl":"PH - Worker's Day","h":1},"2026-05-02":{"t":"off","lbl":"WORK OFF","h":1},"2026-05-03":{"t":"off","lbl":"WORK OFF","h":1},"2026-05-04":{"t":"al","lbl":"Time- OFF (Annual Leave#01) - Carry Fwd from 2025","h":1},"2026-05-05":{"t":"al","lbl":"Time- OFF (Annual Leave#02)- Carry Fwd from 2025","h":1},"2026-05-06":{"t":"al","lbl":"Time- OFF (Annual Leave#03)- Carry Fwd from 2025","h":1},"2026-05-07":{"t":"al","lbl":"Time- OFF (Annual Leave#04)- Carry Fwd from 2025","h":1},"2026-05-08":{"t":"al","lbl":"Time- OFF (Annual Leave#05)- Carry Fwd from 2025","h":1},"2026-05-09":{"t":"off","lbl":"WORK OFF","h":1},"2026-05-10":{"t":"off","lbl":"WORK OFF","h":1},"2026-05-11":{"t":"al","lbl":"Time- OFF (Annual Leave#06)- Carry Fwd from 2025","h":1},"2026-05-12":{"t":"al","lbl":"Time- OFF (Annual Leave#07)","h":1},"2026-05-13":{"t":"al","lbl":"Time- OFF (Annual Leave#08)","h":1},"2026-05-14":{"t":"off","lbl":"PH - Ascension Day of Jesus","h":1},"2026-05-15":{"t":"al","lbl":"Time- OFF (Annual Leave#09)","h":1},"2026-05-16":{"t":"off","lbl":"WORK OFF","h":1},"2026-05-17":{"t":"off","lbl":"WORK OFF","h":1},"2026-05-18":{"t":"al","lbl":"Time- OFF (Annual Leave#10)","h":1},"2026-05-19":{"t":"al","lbl":"Time- OFF (Annual Leave#11)","h":1},"2026-05-20":{"t":"al","lbl":"Time- OFF (Annual Leave#12)","h":1},"2026-05-21":{"t":"al","lbl":"Time- OFF (Annual Leave#13)","h":1},"2026-05-22":{"t":"comp","lbl":"Time- OFF (20/Apr/2025)","h":1},"2026-05-23":{"t":"off","lbl":"WORK OFF","h":1},"2026-05-24":{"t":"off","lbl":"WORK OFF","h":1},"2026-05-25":{"t":"comp","lbl":"Time- OFF (21/Apr/2025)","h":1},"2026-05-26":{"t":"comp","lbl":"Time- OFF (26/Apr/2025)","h":1},"2026-05-27":{"t":"off","lbl":"PH - Hari Raya Qurban*","h":1},"2026-05-28":{"t":"comp","lbl":"Time- OFF (03/May/2025)","h":1},"2026-05-29":{"t":"comp","lbl":"Time- OFF (10/May/2025)","h":1},"2026-05-30":{"t":"comp","lbl":"Time- OFF (11/May/2025)","h":1},"2026-05-31":{"t":"off","lbl":"PH - Wesak Day","h":1},"2026-06-01":{"t":"off","lbl":"PH - Pancasila Birthday","h":1},"2026-06-02":{"t":"other","lbl":"Replacement Rest Day","h":1},"2026-06-03":{"t":"comp","lbl":"Time- OFF (12/May/2025)","h":1},"2026-06-04":{"t":"comp","lbl":"Time- OFF (17/May/2025)","h":1},"2026-06-05":{"t":"comp","lbl":"Time- OFF (24/May/2025)","h":1},"2026-06-06":{"t":"off","lbl":"WORK OFF","h":1},"2026-06-07":{"t":"off","lbl":"WORK OFF","h":1},"2026-06-08":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-06-09":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-06-10":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-06-11":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-06-12":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-06-13":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-06-14":{"t":"off","lbl":"WORK OFF","h":1},"2026-06-15":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-06-16":{"t":"work","in":"7:00","out":"17:30","lbl":"PH - Islamic New Year 1448H (Working)","cr":1.0,"h":1},"2026-06-17":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-06-18":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-06-19":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-06-20":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-06-21":{"t":"off","lbl":"WORK OFF","h":1},"2026-06-22":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-06-23":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-06-24":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-06-25":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-06-26":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-06-27":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-06-28":{"t":"off","lbl":"WORK OFF","h":1},"2026-06-29":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-06-30":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-01":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-02":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-03":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-04":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-07-05":{"t":"off","lbl":"WORK OFF","h":1},"2026-07-06":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-07":{"t":"comp","lbl":"Comp Off (25/May/2025)","h":1},"2026-07-08":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-09":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-10":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-11":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-07-12":{"t":"off","lbl":"WORK OFF","h":1},"2026-07-13":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-14":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-15":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-16":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-17":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-18":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-07-19":{"t":"off","lbl":"WORK OFF","h":1},"2026-07-20":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-21":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-22":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-23":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-24":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-25":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-07-26":{"t":"off","lbl":"WORK OFF","h":1},"2026-07-27":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-28":{"t":"work","in":"7:00","out":"17:30","lbl":"Half Day","h":1},"2026-07-29":{"t":"sick","lbl":"Sick Day - Rest","h":1},"2026-07-30":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-07-31":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-01":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-08-02":{"t":"off","lbl":"WORK OFF","h":1},"2026-08-03":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-04":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-05":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-06":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-07":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-08":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-08-09":{"t":"off","lbl":"WORK OFF","h":1},"2026-08-10":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-11":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-12":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-13":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-14":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-15":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-08-16":{"t":"off","lbl":"WORK OFF","h":1},"2026-08-17":{"t":"off","lbl":"PH - Independence Day","h":1},"2026-08-18":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-19":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-20":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-21":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-22":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-08-23":{"t":"off","lbl":"WORK OFF","h":1},"2026-08-24":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-25":{"t":"work","in":"7:00","out":"17:30","lbl":"PH - Prophet Muhammad's Birthday","cr":1.0,"h":1},"2026-08-26":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-27":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-28":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-08-29":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-08-30":{"t":"off","lbl":"WORK OFF","h":1},"2026-08-31":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-09-01":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-09-02":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-09-03":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-09-04":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-09-05":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-09-06":{"t":"work","in":"9:00","out":"14:00","lbl":"Sei Mangkei","note":"Working","cr":0.5,"h":1},"2026-09-07":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-09-08":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-09-09":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-09-10":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-09-11":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-09-12":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-09-13":{"t":"off","lbl":"WORK OFF","h":1},"2026-09-14":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-09-15":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-09-16":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-09-17":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-09-18":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-09-19":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","note":"Working","cr":1.0,"h":1},"2026-09-20":{"t":"off","lbl":"WORK OFF","h":1},"2026-09-21":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1},"2026-09-22":{"t":"work","in":"7:00","out":"17:30","lbl":"Sei Mangkei","h":1}},"pool":[{"d":"2025-06-01","v":1.0,"why":"Working + PH Pancasila Birthday"},{"d":"2025-06-02","v":1.0,"why":"Sei Mangkei"},{"d":"2025-06-07","v":1.0,"why":"PH -Hari Raya Qurban"},{"d":"2025-06-08","v":1.0,"why":"Sei Mangkei"},{"d":"2025-06-14","v":1.0,"why":"Sei Mangkei"},{"d":"2025-06-15","v":1.0,"why":"Sei Mangkei"},{"d":"2025-06-21","v":1.0,"why":"Sei Mangkei"},{"d":"2025-06-27","v":1.0,"why":"PH - Awal Muharam (Maal Hijrah)"},{"d":"2025-06-28","v":1.0,"why":"Sei Mangkei"},{"d":"2025-07-12","v":1.0,"why":"Sei Mangkei"},{"d":"2025-07-19","v":1.0,"why":"Immigration Visit - Siantar"},{"d":"2025-07-20","v":1.0,"why":"Sei Mangkei to Jakarta"},{"d":"2025-08-02","v":1.0,"why":"Sei Mangkei"},{"d":"2025-09-05","v":1.0,"why":"PH - Prophet Muhammad's Birthday"},{"d":"2025-09-06","v":1.0,"why":"Sei Mangkei"},{"d":"2025-09-14","v":1.0,"why":"Sei Mangkei"},{"d":"2025-09-20","v":1.0,"why":"Sei Mangkei"},{"d":"2025-09-27","v":1.0,"why":"Sei Mangkei"},{"d":"2025-10-12","v":0.5,"why":"Sei Mangkei"},{"d":"2025-10-18","v":1.0,"why":"Sei Mangkei"},{"d":"2025-10-25","v":1.0,"why":"Sei Mangkei"},{"d":"2025-11-01","v":1.0,"why":"Sei Mangkei"},{"d":"2025-11-08","v":1.0,"why":"Sei Mangkei"},{"d":"2025-11-15","v":1.0,"why":"Sei Mangkei"},{"d":"2025-11-22","v":1.0,"why":"Sei Mangkei"},{"d":"2026-01-10","v":1.0,"why":"Sei Mangkei"},{"d":"2026-01-16","v":1.0,"why":"PH-Isra Mikraj Prophet Muhammad"},{"d":"2026-01-17","v":1.0,"why":"Team Building (Medan)"},{"d":"2026-01-24","v":1.0,"why":"Sei Mangkei"},{"d":"2026-01-31","v":1.0,"why":"Sei Mangkei"},{"d":"2026-02-07","v":1.0,"why":"Sei Mangkei"},{"d":"2026-02-10","v":0.5,"why":"Sei Mangkei"},{"d":"2026-02-14","v":1.0,"why":"Sei Mangkei"},{"d":"2026-02-17","v":1.0,"why":"PH - Chinese New Year"},{"d":"2026-02-21","v":1.0,"why":"Sei Mangkei"},{"d":"2026-02-28","v":1.0,"why":"Sei Mangkei"},{"d":"2026-03-07","v":1.0,"why":"Nilai"},{"d":"2026-03-14","v":1.0,"why":"Sei Mangkei"},{"d":"2026-03-19","v":1.0,"why":"PH - Hindu Holidays (Nyepi) 1948"},{"d":"2026-03-23","v":1.0,"why":"Replacement Rest Day"},{"d":"2026-04-03","v":1.0,"why":"PH - Good Friday"},{"d":"2026-04-04","v":1.0,"why":"Sei Mangkei"},{"d":"2026-04-06","v":1.0,"why":"Replacement Rest Day (Working)"},{"d":"2026-04-11","v":1.0,"why":"Sei Mangkei"},{"d":"2026-04-18","v":1.0,"why":"Sei Mangkei"},{"d":"2026-04-25","v":1.0,"why":"Sei Mangkei"},{"d":"2026-06-13","v":1.0,"why":"Sei Mangkei"},{"d":"2026-06-16","v":1.0,"why":"PH - Islamic New Year 1448H (Working)"},{"d":"2026-06-20","v":1.0,"why":"Sei Mangkei"},{"d":"2026-06-27","v":1.0,"why":"Sei Mangkei"},{"d":"2026-07-04","v":1.0,"why":"Sei Mangkei"},{"d":"2026-07-11","v":1.0,"why":"Sei Mangkei"},{"d":"2026-07-18","v":1.0,"why":"Sei Mangkei"},{"d":"2026-07-25","v":1.0,"why":"Sei Mangkei"},{"d":"2026-08-01","v":1.0,"why":"Sei Mangkei"},{"d":"2026-08-08","v":1.0,"why":"Sei Mangkei"},{"d":"2026-08-15","v":1.0,"why":"Sei Mangkei"},{"d":"2026-08-22","v":1.0,"why":"Sei Mangkei"},{"d":"2026-08-25","v":1.0,"why":"PH - Prophet Muhammad's Birthday"},{"d":"2026-08-29","v":1.0,"why":"Sei Mangkei"},{"d":"2026-09-05","v":1.0,"why":"Sei Mangkei"},{"d":"2026-09-06","v":0.5,"why":"Sei Mangkei"},{"d":"2026-09-12","v":1.0,"why":"Sei Mangkei"},{"d":"2026-09-19","v":1.0,"why":"Sei Mangkei"}],"holidays":{"2026-01-01":"New Year 2026","2026-01-16":"Isra Mikraj Prophet Muhammad","2026-02-17":"Chinese New Year","2026-03-19":"Hindu Holidays (Nyepi) 1948","2026-03-21":"Hari Raya Puasa (Eid-ul-Fitri)","2026-03-22":"Hari Raya Puasa (2nd day)","2026-04-03":"Good Friday","2026-04-05":"Easter Day","2026-05-01":"Worker's Day","2026-05-14":"Ascension Day of Jesus","2026-05-27":"Hari Raya Qurban","2026-05-31":"Wesak Day","2026-06-01":"Pancasila Birthday","2026-06-16":"Islamic New Year 1448H","2026-08-17":"Independence Day","2026-08-25":"Prophet Muhammad's Birthday","2026-12-25":"Christmas","2027-01-01":"New Year 2027","2027-01-05":"Isra Mikraj Prophet Muhammad","2027-02-06":"Chinese New Year","2027-03-08":"Hindu Holidays (Nyepi) 1949","2027-03-10":"Hari Raya Puasa (Eid-ul-Fitri)","2027-03-11":"Hari Raya Puasa (2nd day)","2027-03-26":"Good Friday","2027-03-28":"Easter Day","2027-05-01":"Worker's Day","2027-05-06":"Ascension Day of Jesus","2027-05-17":"Hari Raya Qurban","2027-05-20":"Wesak Day","2027-06-01":"Pancasila Birthday","2027-06-06":"Islamic New Year 1449H","2027-08-15":"Prophet Muhammad's Birthday","2027-08-17":"Independence Day","2027-12-25":"Christmas","2027-12-26":"Isra Mikraj Prophet Muhammad"}};
+const VERSION='1.0.0';
+const KEY='iggy_timesheet_v1';
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONS=['Jan','Feb','Mar','Apr','May','Jun','July','Aug','Sept','Oct','Nov','Dec'];
+const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------- i18n ---------- */
+const L={
+en:{title:'Timesheet',tCycle:'Cycle',tComp:'Comp-off',tCycles:'All cycles',tHol:'Holidays',tSet:'Settings',
+ work:'Work',off:'Off',comp:'Comp-off',al:'Leave',sick:'Sick',travel:'Travel',other:'Other',
+ worked:'Days worked',restwork:'Rest-day work',earned:'Earned',used:'Used',balance:'Balance',
+ prev:'Previous',next:'Next',sent:'Sent',due:'Due',dueIn:'Due in {n} d',dueToday:'Due today',overdue:'Overdue by {n} d',notYet:'Not started',
+ attn:'{n} weekend / holiday days use defaults. Check them, then confirm.',confirmAll:'Confirm all days',
+ preview:'Preview & send',back:'Back to days',in:'In',out:'Out',loc:'Location / label',cmt:'Comment',half:'Half day',
+ uc:'Deduct from comp-off',ref:'Comp-off credit to use',auto:'Auto (oldest first)',creditOv:'Comp-off earned',reset:'Reset to default',confirm:'Confirm',
+ noCredit:'No comp-off credit available for this day.',hist:'Imported from your Excel tracker. Counted in the opening balance.',
+ to:'To',cc:'Cc',subject:'Subject',copyEmail:'Copy email',copyTable:'Copy table only',dlEml:'Download draft (.eml)',markSent:'Mark as sent',unmark:'Mark as not sent',
+ copied:'Copied. Paste into Outlook.',copyFail:'Copy blocked. Select the preview and copy it by hand.',saved:'Saved',
+ compBal:'Comp-off balance',openCred:'Open credits',days:'days',earnedOn:'Earned',why:'Reason',left:'Left',age:'Age',usedLog:'Used since opening',usedOn:'Taken on',creditUsed:'Credit used',
+ adj:'Manual adjustment',adjDate:'Date',adjVal:'Days (+ or −)',adjWhy:'Reason',add:'Add',remove:'Remove',
+ cycle:'Cycle',status:'Status',openingNote:'Opening balance as of {d}, calculated from your Excel tracker. Edit if your records differ.',
+ holNote:'Indonesian public holidays. Holidays on Sat or Sun give a replacement rest day on the next working day.',prov:'Provisional. Check against the official SKB.',
+ date:'Date',name:'Holiday name',replacement:'Replacement day',
+ sName:'Your name',sTitle:'Title',sTo:'Email to',sCc:'Email cc',sFrom:'Your email',sGreet:'Greeting',sSign:'Signature',sLoc:'Default location',sIn:'Default in',sOut:'Default out',
+ sSat:'Saturdays by default',sSatW:'Working',sSatO:'Off',backup:'Backup',exportJson:'Download backup',copyJson:'Copy backup',restore:'Restore from backup',restoreBtn:'Restore',
+ cloud:'Cloud sync (optional)',cloudUrl:'Apps Script web app URL',cloudKey:'Sync key',cloudPush:'Save to cloud',cloudPull:'Load from cloud',
+ backupOld:'No backup in {n} days. Download one.',storageOff:'This browser blocks saving. Download a backup after each session.',
+ actionNone:'No action required',weekdayWork:'Working day',replDay:'Replacement Rest Day',ph:'PH',repl:'Repl.',future:'Upcoming'},
+id:{title:'Lembar Waktu',tCycle:'Periode',tComp:'Cuti Pengganti',tCycles:'Semua periode',tHol:'Hari Libur',tSet:'Pengaturan',
+ work:'Kerja',off:'Libur',comp:'Comp-off',al:'Cuti',sick:'Sakit',travel:'Perjalanan',other:'Lainnya',
+ worked:'Hari kerja',restwork:'Kerja hari libur',earned:'Didapat',used:'Dipakai',balance:'Saldo',
+ prev:'Sebelumnya',next:'Berikutnya',sent:'Terkirim',due:'Batas',dueIn:'Batas {n} hari lagi',dueToday:'Batas hari ini',overdue:'Terlambat {n} hari',notYet:'Belum mulai',
+ attn:'{n} hari akhir pekan / libur memakai nilai bawaan. Periksa lalu konfirmasi.',confirmAll:'Konfirmasi semua hari',
+ preview:'Pratinjau & kirim',back:'Kembali ke hari',in:'Masuk',out:'Pulang',loc:'Lokasi / label',cmt:'Keterangan',half:'Setengah hari',
+ uc:'Potong dari comp-off',ref:'Kredit comp-off yang dipakai',auto:'Otomatis (terlama dulu)',creditOv:'Comp-off didapat',reset:'Kembalikan bawaan',confirm:'Konfirmasi',
+ noCredit:'Tidak ada kredit comp-off untuk hari ini.',hist:'Diimpor dari Excel Anda. Sudah masuk saldo awal.',
+ to:'Kepada',cc:'Cc',subject:'Subjek',copyEmail:'Salin email',copyTable:'Salin tabel saja',dlEml:'Unduh draf (.eml)',markSent:'Tandai terkirim',unmark:'Tandai belum terkirim',
+ copied:'Tersalin. Tempel di Outlook.',copyFail:'Penyalinan diblokir. Pilih pratinjau lalu salin manual.',saved:'Tersimpan',
+ compBal:'Saldo comp-off',openCred:'Kredit terbuka',days:'hari',earnedOn:'Didapat',why:'Alasan',left:'Sisa',age:'Umur',usedLog:'Dipakai sejak saldo awal',usedOn:'Diambil',creditUsed:'Kredit dipakai',
+ adj:'Penyesuaian manual',adjDate:'Tanggal',adjVal:'Hari (+ atau −)',adjWhy:'Alasan',add:'Tambah',remove:'Hapus',
+ cycle:'Periode',status:'Status',openingNote:'Saldo awal per {d}, dihitung dari Excel Anda. Ubah jika catatan Anda berbeda.',
+ holNote:'Hari libur nasional Indonesia. Libur pada Sabtu atau Minggu diganti di hari kerja berikutnya.',prov:'Sementara. Cek SKB resmi.',
+ date:'Tanggal',name:'Nama hari libur',replacement:'Hari pengganti',
+ sName:'Nama Anda',sTitle:'Jabatan',sTo:'Email tujuan',sCc:'Email cc',sFrom:'Email Anda',sGreet:'Salam',sSign:'Tanda tangan',sLoc:'Lokasi bawaan',sIn:'Masuk bawaan',sOut:'Pulang bawaan',
+ sSat:'Sabtu secara bawaan',sSatW:'Kerja',sSatO:'Libur',backup:'Cadangan',exportJson:'Unduh cadangan',copyJson:'Salin cadangan',restore:'Pulihkan dari cadangan',restoreBtn:'Pulihkan',
+ cloud:'Sinkron cloud (opsional)',cloudUrl:'URL web app Apps Script',cloudKey:'Kunci sinkron',cloudPush:'Simpan ke cloud',cloudPull:'Muat dari cloud',
+ backupOld:'Belum ada cadangan {n} hari. Unduh satu.',storageOff:'Browser ini memblokir penyimpanan. Unduh cadangan setiap selesai.',
+ actionNone:'Tidak perlu tindakan',weekdayWork:'Hari kerja',replDay:'Hari Libur Pengganti',ph:'Libur',repl:'Pengg.'},
+ms:{title:'Lembaran Masa',tCycle:'Kitaran',tComp:'Cuti Ganti',tCycles:'Semua kitaran',tHol:'Cuti Umum',tSet:'Tetapan',
+ work:'Kerja',off:'Cuti',comp:'Comp-off',al:'Cuti',sick:'Sakit',travel:'Perjalanan',other:'Lain-lain',
+ worked:'Hari bekerja',restwork:'Kerja hari rehat',earned:'Diperoleh',used:'Digunakan',balance:'Baki',
+ prev:'Sebelum',next:'Seterusnya',sent:'Dihantar',due:'Tarikh akhir',dueIn:'Tarikh akhir {n} hari lagi',dueToday:'Tarikh akhir hari ini',overdue:'Lewat {n} hari',notYet:'Belum bermula',
+ attn:'{n} hari hujung minggu / cuti guna nilai lalai. Semak kemudian sahkan.',confirmAll:'Sahkan semua hari',
+ preview:'Pratonton & hantar',back:'Kembali ke hari',in:'Masuk',out:'Keluar',loc:'Lokasi / label',cmt:'Komen',half:'Separuh hari',
+ uc:'Tolak daripada comp-off',ref:'Kredit comp-off digunakan',auto:'Auto (paling lama dahulu)',creditOv:'Comp-off diperoleh',reset:'Set semula',confirm:'Sahkan',
+ noCredit:'Tiada kredit comp-off untuk hari ini.',hist:'Diimport daripada Excel anda. Termasuk dalam baki awal.',
+ to:'Kepada',cc:'Cc',subject:'Subjek',copyEmail:'Salin e-mel',copyTable:'Salin jadual sahaja',dlEml:'Muat turun draf (.eml)',markSent:'Tanda dihantar',unmark:'Tanda belum dihantar',
+ copied:'Disalin. Tampal dalam Outlook.',copyFail:'Salinan disekat. Pilih pratonton dan salin sendiri.',saved:'Disimpan',
+ compBal:'Baki comp-off',openCred:'Kredit terbuka',days:'hari',earnedOn:'Diperoleh',why:'Sebab',left:'Baki',age:'Umur',usedLog:'Digunakan sejak baki awal',usedOn:'Diambil',creditUsed:'Kredit digunakan',
+ adj:'Pelarasan manual',adjDate:'Tarikh',adjVal:'Hari (+ atau −)',adjWhy:'Sebab',add:'Tambah',remove:'Buang',
+ cycle:'Kitaran',status:'Status',openingNote:'Baki awal pada {d}, dikira daripada Excel anda. Ubah jika rekod anda berbeza.',
+ holNote:'Cuti umum Indonesia. Cuti pada Sabtu atau Ahad diganti pada hari bekerja berikutnya.',prov:'Sementara. Semak SKB rasmi.',
+ date:'Tarikh',name:'Nama cuti',replacement:'Hari ganti',
+ sName:'Nama anda',sTitle:'Jawatan',sTo:'E-mel kepada',sCc:'E-mel cc',sFrom:'E-mel anda',sGreet:'Salam',sSign:'Tandatangan',sLoc:'Lokasi lalai',sIn:'Masuk lalai',sOut:'Keluar lalai',
+ sSat:'Sabtu secara lalai',sSatW:'Kerja',sSatO:'Cuti',backup:'Sandaran',exportJson:'Muat turun sandaran',copyJson:'Salin sandaran',restore:'Pulihkan daripada sandaran',restoreBtn:'Pulihkan',
+ cloud:'Segerak awan (pilihan)',cloudUrl:'URL web app Apps Script',cloudKey:'Kunci segerak',cloudPush:'Simpan ke awan',cloudPull:'Muat daripada awan',
+ backupOld:'Tiada sandaran sejak {n} hari. Muat turun satu.',storageOff:'Pelayar ini menyekat simpanan. Muat turun sandaran selepas setiap sesi.',
+ actionNone:'Tiada tindakan diperlukan',weekdayWork:'Hari bekerja',replDay:'Hari Rehat Ganti',ph:'Cuti',repl:'Ganti'}
+};
+let lang='en';
+const t=(k,v)=>{let s=(L[lang]&&L[lang][k])||L.en[k]||k;if(v)for(const a in v)s=s.replace('{'+a+'}',v[a]);return s};
+
+/* ---------- dates ---------- */
+const pad=n=>String(n).padStart(2,'0');
+const P=iso=>{const[y,m,d]=iso.split('-').map(Number);return new Date(Date.UTC(y,m-1,d))};
+const iso=dt=>`${dt.getUTCFullYear()}-${pad(dt.getUTCMonth()+1)}-${pad(dt.getUTCDate())}`;
+const add=(i,n)=>{const d=P(i);d.setUTCDate(d.getUTCDate()+n);return iso(d)};
+const dow=i=>P(i).getUTCDay();
+const isWk=i=>{const d=dow(i);return d===0||d===6};
+const diff=(a,b)=>Math.round((P(a)-P(b))/864e5);
+const fEmail=i=>{const d=P(i);return `${pad(d.getUTCDate())}-${MON[d.getUTCMonth()]}-${String(d.getUTCFullYear()).slice(2)}`};
+const fRef=i=>{const d=P(i);return `${pad(d.getUTCDate())}/${MON[d.getUTCMonth()]}/${d.getUTCFullYear()}`};
+const fShort=i=>{const d=P(i);return `${d.getUTCDate()} ${MON[d.getUTCMonth()]} ${d.getUTCFullYear()}`};
+const localISO=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+const TODAY=new URLSearchParams(location.search).get('today')||localISO();
+const hm=s=>{if(!s)return'';const[a,b]=s.split(':');return `${pad(+a)}:${b}`};
+const hmE=s=>{if(!s||s==='NA')return'NA';const[a,b]=s.split(':');return `${+a}:${b}`};
+const hrs=(a,b)=>{if(!a||!b)return 0;const f=s=>{const[x,y]=s.split(':').map(Number);return x*60+y};return Math.max(0,(f(b)-f(a))/60)};
+
+/* ---------- state ---------- */
+let S=null,memOnly=false;
+function defaults(){
+  return {v:1,settings:{name:'Ignatius Fernandes',title:'HSSE Manager - Project',from:'Ignatius.Ambrosio@ecooils.com.my',
+    to:'salaniah.nilai@ecooils.com.my',cc:'Hang-Yuh.Teo@ecooils.com.my; dwi@ecooils.co.id; jop.kaban@ecooils.co.id',
+    greet:'Dear Ka Sal,',sign:'Ignatius Fernandes\nHSSE Manager - Project\nOffice: - +62 811-3058-1059\n\nPT EcoOils Jaya Indonesia\nJl Kelapa Sawit II,\nKav 6 Kawasan Ekonomi Khusus\nSei Mangkei – Bosar Maligas\nSimalungun 21183\nwww.ecooilsenergy.com',
+    loc:'Sei Mangkei',in:'7:00',out:'17:30',sat:'work',sync:'',syncKey:'',lastBackup:null,lang:'en'},
+    holidays:SEED.holidays,prov:[2027],days:SEED.days,pool:SEED.pool,cutoff:'2026-09-22',adj:[],sent:{}};
+}
+function load(){
+  try{const r=localStorage.getItem(KEY);if(r){const o=JSON.parse(r);if(o&&o.v)return o}}catch(e){memOnly=true}
+  return defaults();
+}
+let syncTimer=null;
+function persist(){
+  try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){memOnly=true}
+  if(S.settings.sync){clearTimeout(syncTimer);syncTimer=setTimeout(()=>cloudPush(true),2500)}
+}
+function save(){persist();render()}
+function toast(m){const e=$('#toast');e.textContent=m;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2600)}
+
+/* ---------- calendar rules ---------- */
+let replCache={k:'',m:{}};
+function repl(){
+  const k=JSON.stringify(S.holidays);if(replCache.k===k)return replCache.m;
+  const m={};
+  Object.keys(S.holidays).sort().forEach(h=>{
+    const w=dow(h);if(w!==0&&w!==6)return;
+    let c=add(h,w===6?2:1);
+    while(isWk(c)||S.holidays[c]||m[c])c=add(c,1);
+    m[c]=S.holidays[h];
+  });
+  replCache={k,m};return m;
+}
+const ph=i=>S.holidays[i]||null;
+const rd=i=>repl()[i]||null;
+const autoState=i=>isWk(i)?(dow(i)===6?S.settings.sat:'off'):((ph(i)||rd(i))?'off':'work');
+const restDay=i=>isWk(i)||!!ph(i)||!!rd(i);
+
+function resolve(i){
+  const rec=S.days[i];const st=rec?rec.t:autoState(i);const r0=rec||{};
+  const wk=isWk(i),p=ph(i),q=rd(i);
+  const o={d:i,st,conf:!!rec,hist:!!r0.h,wk,ph:p,rd:q,half:!!r0.half,earn:0,use:0,inT:null,outT:null,loc:'',note:''};
+  const loc0=S.settings.loc;
+  if(st==='work'){
+    o.inT=r0.in||S.settings.in;o.outT=r0.out||S.settings.out;
+    if(r0.cr!=null)o.earn=r0.cr;
+    else if(restDay(i)&&!r0.h)o.earn=r0.half?.5:(hrs(o.inT,o.outT)>=6?1:.5);
+    o.loc=p?'PH - '+p:q?loc0+' (Replacement Rest Day - '+q+')':loc0;
+    o.note=(restDay(i)||wk)?'Working':'';
+  }else{
+    if(st==='off'){o.loc=p?'PH - '+p:q?'Replacement Rest Day - '+q:wk?'WORK OFF':'OFF';}
+    if(st==='comp'){o.use=r0.half?.5:1;o.loc=loc0+' - Comp Off'+(r0.half?' - Half Day':'');}
+    if(st==='al'){const y=i.slice(0,4);const n=Object.keys(S.days).filter(k=>k.slice(0,4)===y&&k<=i&&S.days[k].t==='al').length+(rec?0:1);o.loc=y+' Annual Leave #'+pad(n);}
+    if(st==='sick'){o.loc='Sick Day - Rest'+(r0.half?' - Half Day':'');if(r0.uc)o.use=r0.half?.5:1;}
+    if(st==='travel'){o.loc='Travel';if(r0.uc)o.use=r0.half?.5:1;}
+    if(st==='other'){o.loc='';if(r0.uc)o.use=r0.half?.5:1;}
+    o.inT=r0.in||null;o.outT=r0.out||null;
+  }
+  if(r0.lbl)o.loc=r0.lbl;
+  if(r0.note!=null&&r0.note!=='')o.note=r0.note;
+  o.rec=rec||null;
+  return o;
+}
+
+/* ---------- ledger ---------- */
+function counted(i){return i>S.cutoff&&(!!S.days[i]||i<=TODAY)}
+function ledger(){
+  const cr=[];
+  S.pool.forEach((p,k)=>cr.push({id:'p'+k,d:p.d,why:p.why,v:+p.v,rem:+p.v}));
+  const deb=[];
+  S.adj.forEach((a,k)=>{if(a.v>0)cr.push({id:'a'+k,d:a.d,why:a.why||'Adjustment',v:a.v,rem:a.v});else deb.push({d:a.d,use:-a.v,ref:null,adj:true,why:a.why})});
+  const lastKey=Object.keys(S.days).sort().pop()||S.cutoff;
+  const end=lastKey>TODAY?lastKey:TODAY;
+  for(let i=add(S.cutoff,1);i<=end;i=add(i,1)){
+    if(!counted(i))continue;const r=resolve(i);
+    if(r.earn>0)cr.push({id:'d'+i,d:i,why:(r.ph&&!r.wk?'PH - '+r.ph:r.rd?'Replacement day worked':r.wk?(dow(i)===6?'Saturday worked':'Sunday worked'):'Extra work'),v:r.earn,rem:r.earn});
+    if(r.use>0)deb.push({d:i,use:r.use,ref:r.rec&&r.rec.ref||null});
+  }
+  cr.sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
+  const refs={},short={};
+  const take=(c,v)=>{const x=Math.min(c.rem,v);c.rem-=x;return x};
+  deb.sort((a,b)=>a.d<b.d?-1:1);
+  deb.forEach(x=>{ if(x.ref){const c=cr.find(c=>c.d===x.ref&&c.rem>0);if(c){const g=take(c,x.use);(refs[x.d]=refs[x.d]||[]).push({cd:c.d,v:g});x.use-=g}}});
+  deb.forEach(x=>{ while(x.use>1e-9){const c=cr.find(c=>c.rem>0&&c.d<=x.d)||cr.find(c=>c.rem>0);if(!c){short[x.d]=(short[x.d]||0)+x.use;break}const g=take(c,x.use);(refs[x.d]=refs[x.d]||[]).push({cd:c.d,v:g});x.use-=g}});
+  const tot=cr.reduce((s,c)=>s+c.v,0);
+  const rem=cr.reduce((s,c)=>s+c.rem,0);
+  const usedAll=deb.length?0:0;
+  return {cr,deb,refs,short,balance:tot-sumUse(),open:cr.filter(c=>c.rem>1e-9),tot};
+}
+function sumUse(){let u=0;S.adj.forEach(a=>{if(a.v<0)u+=-a.v});const lastKey=Object.keys(S.days).sort().pop()||S.cutoff;const end=lastKey>TODAY?lastKey:TODAY;
+  for(let i=add(S.cutoff,1);i<=end;i=add(i,1)){if(counted(i))u+=resolve(i).use}return u}
+function balAt(x){
+  let b=S.pool.reduce((s,p)=>s+ +p.v,0);S.adj.forEach(a=>{if(a.d<=x)b+=a.v});
+  for(let i=add(S.cutoff,1);i<=x;i=add(i,1)){if(!counted(i))continue;const r=resolve(i);b+=r.earn-r.use}
+  return b;
+}
+const refLabel=(LD,i)=>{const a=LD.refs[i];return a&&a.length?a.map(x=>fRef(x.cd)).join(', '):''};
+
+/* ---------- cycles ---------- */
+function cycleOf(i){
+  const d=P(i);let y=d.getUTCFullYear(),m=d.getUTCMonth();
+  if(d.getUTCDate()>=23){m++;if(m>11){m=0;y++}}
+  const end=`${y}-${pad(m+1)}-22`;
+  let sy=y,sm=m-1;if(sm<0){sm=11;sy--}
+  return {id:`${y}-${pad(m+1)}`,start:`${sy}-${pad(sm+1)}-23`,end,due:`${y}-${pad(m+1)}-21`};
+}
+const cycById=id=>cycleOf(id+'-22');
+const nextCyc=c=>cycleOf(add(c.end,1)), prevCyc=c=>cycleOf(add(c.start,-1));
+const cycLabel=c=>{const a=P(c.start),b=P(c.end);return `23 ${MONS[a.getUTCMonth()]} to 22 ${MONS[b.getUTCMonth()]} -${b.getUTCFullYear()}`};
+const cycNice=c=>{const a=P(c.start),b=P(c.end);return `23 ${MON[a.getUTCMonth()]} – 22 ${MON[b.getUTCMonth()]} ${b.getUTCFullYear()}`};
+const cycDays=c=>{const a=[];for(let i=c.start;i<=c.end;i=add(i,1))a.push(i);return a};
+const FIRST='2025-05';
+function isSent(c){return !!S.sent[c.id]||c.end<=S.cutoff}
+function currentCycle(){
+  let c=cycById(FIRST);
+  while(isSent(c)||c.start>TODAY){ if(c.start>TODAY)return prevCyc(c)&&cycleOf(TODAY); c=nextCyc(c)}
+  return c;
+}
+function cycStats(c){
+  const LD=ledger();let w=0,rw=0,e=0,u=0,att=0;
+  cycDays(c).forEach(i=>{const r=resolve(i);
+    if(r.st==='work'){w++;if(r.wk||r.ph||r.rd)rw++}
+    if(r.earn>0)e+=r.earn;if(r.use>0)u+=r.use;
+    if(!r.conf&&restDay(i)&&i<=TODAY)att++;});
+  return {w,rw,e,u,att,bal:c.end>=S.cutoff&&!c.hist?balAt(c.end<TODAY||c.end===TODAY?c.end:TODAY>c.start?TODAY:c.end):null,LD};
+}
+const num=n=>(Math.round(n*2)/2).toString().replace(/\.0$/,'');
+
+/* ---------- email ---------- */
+function emailRows(c){
+  const LD=ledger();
+  return cycDays(c).map(i=>{
+    const r=resolve(i);
+    let note=r.note;
+    const rl=refLabel(LD,i);
+    if(r.use>0){note=r.rec&&r.rec.note?r.rec.note:(rl?'Comp Off ('+rl+')':'Comp Off')}
+    const na=!(r.st==='work');
+    let a=hmE(r.inT),b=hmE(r.outT);
+    if(na&&!(r.inT&&r.outT)){a='NA';b='NA'}
+    return {d:fEmail(i),w:DOW[dow(i)],a,b,loc:r.loc,note};
+  });
+}
+function emailHtml(c,withFrame){
+  const rows=emailRows(c);const st=S.settings;
+  const td='style="border:1px solid #999;padding:3px 8px;font-family:Calibri,Arial,sans-serif;font-size:11pt;"';
+  const th='style="border:1px solid #999;padding:3px 8px;font-family:Calibri,Arial,sans-serif;font-size:11pt;background:#f2f2f2;text-align:left;"';
+  let h='<table style="border-collapse:collapse;"><thead><tr>'+['Date','Day','In','Out','Location','Replacement leave/Comments'].map(x=>`<th ${th}>${x}</th>`).join('')+'</tr></thead><tbody>';
+  rows.forEach(r=>{h+=`<tr><td ${td}>${r.d}</td><td ${td}>${r.w}</td><td ${td}>${r.a}</td><td ${td}>${r.b}</td><td ${td}>${esc(r.loc)}</td><td ${td}>${esc(r.note)}</td></tr>`});
+  h+='</tbody></table>';
+  if(!withFrame)return h;
+  const f='font-family:Calibri,Arial,sans-serif;font-size:11pt;';
+  return `<div style="${f}"><p>${esc(st.greet)}</p><p>Please find below details:-</p>${h}<p>Regards,</p><p>${esc(st.sign).replace(/\n/g,'<br>')}</p></div>`;
+}
+function emailText(c,withFrame){
+  const rows=emailRows(c);
+  const tb=['Date','Day','In','Out','Location','Replacement leave/Comments'].join('\t')+'\n'+rows.map(r=>[r.d,r.w,r.a,r.b,r.loc,r.note].join('\t')).join('\n');
+  if(!withFrame)return tb;
+  return `${S.settings.greet}\n\nPlease find below details:-\n\n${tb}\n\nRegards,\n\n${S.settings.sign}\n`;
+}
+const subjectFor=c=>`Attendance Update for ${cycLabel(c)} - Payroll (${S.settings.name})`;
+async function copyRich(html,text){
+  try{await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([text],{type:'text/plain'})})]);return true}catch(e){}
+  try{const d=document.createElement('div');d.contentEditable='true';d.innerHTML=html;d.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(d);
+    const rg=document.createRange();rg.selectNodeContents(d);const s=getSelection();s.removeAllRanges();s.addRange(rg);const ok=document.execCommand('copy');s.removeAllRanges();d.remove();return ok}catch(e){return false}
+}
+function b64(s){const by=new TextEncoder().encode(s);let bin='';by.forEach(x=>bin+=String.fromCharCode(x));return btoa(bin).replace(/(.{76})/g,'$1\r\n')}
+function buildEml(c,to,cc,subj){
+  const st=S.settings;
+  const hdr=[`From: ${st.name} <${st.from}>`,`To: ${to.replace(/;/g,',')}`,cc?`Cc: ${cc.replace(/;/g,',')}`:null,`Subject: ${subj}`,'X-Unsent: 1','MIME-Version: 1.0','Content-Type: text/html; charset=utf-8','Content-Transfer-Encoding: base64'].filter(Boolean);
+  return hdr.join('\r\n')+'\r\n\r\n'+b64('<html><body>'+emailHtml(c,true)+'</body></html>');
+}
+function download(name,text,type){
+  try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();a.remove();return true}catch(e){return false}
+}
+
+/* ---------- cloud ---------- */
+async function cloudPush(silent){
+  const u=S.settings.sync;if(!u)return;
+  try{await fetch(u,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({key:S.settings.syncKey,data:S})});if(!silent)toast(t('saved'))}
+  catch(e){if(!silent)toast('Cloud: '+e.message)}
+}
+async function cloudPull(){
+  const u=S.settings.sync;if(!u)return;
+  try{const r=await fetch(u+(u.includes('?')?'&':'?')+'key='+encodeURIComponent(S.settings.syncKey));const o=await r.json();
+    if(o&&o.v){const keep={sync:S.settings.sync,syncKey:S.settings.syncKey};S=o;S.settings={...defaults().settings,...S.settings,...keep};save();toast(t('saved'))}else toast('Cloud: empty')}
+  catch(e){toast('Cloud: '+e.message)}
+}
+
+/* ---------- UI state ---------- */
+const ui={tab:'cycle',cyc:null,open:null,send:false,year:2026,restoreTxt:''};
+function setDay(i,patch,replace){
+  const cur=S.days[i]||{t:autoState(i)};
+  S.days[i]=replace?patch:{...cur,...patch};
+  save();
+}
+function setState(i,st){
+  const keep=S.days[i]&&S.days[i].h?{h:1}:{};
+  const o={t:st,...keep};
+  if(st==='work'){o.in=S.settings.in;o.out=S.settings.out}
+  S.days[i]=o;save();
+}
+
+/* ---------- views ---------- */
+function vHeader(){
+  return `<div class="top"><div><h1>${t('title')}</h1><div class="sub">${esc(S.settings.name)} · ${esc(S.settings.title)}</div></div>
+  <div class="ver-wrap"><span class="ver" id="ver">v${VERSION}</span><div class="lang" role="group" aria-label="Language">${['en','id','ms'].map(l=>`<button data-act="lang" data-v="${l}" aria-pressed="${lang===l}">${l.toUpperCase()}</button>`).join('')}</div></div></div>
+  <div class="tabs" role="tablist">${[['cycle','tCycle'],['comp','tComp'],['cycles','tCycles'],['hol','tHol'],['set','tSet']].map(([k,l])=>`<button role="tab" data-act="tab" data-v="${k}" aria-selected="${ui.tab===k}">${t(l)}</button>`).join('')}</div>
+  ${memOnly?`<div class="banner">${t('storageOff')}</div>`:''}`;
+}
+function dueChip(c){
+  if(S.sent[c.id])return `<span class="chip ok">${t('sent')} ${fShort(S.sent[c.id].slice(0,10))}</span>`;
+  if(c.end<=S.cutoff)return `<span class="chip ok">${t('sent')}</span>`;
+  if(c.start>TODAY)return `<span class="chip">${t('notYet')}</span>`;
+  const n=diff(c.due,TODAY);
+  if(n>0)return `<span class="chip warn">${t('dueIn',{n})} · ${fShort(c.due)}</span>`;
+  if(n===0)return `<span class="chip warn">${t('dueToday')}</span>`;
+  return `<span class="chip bad">${t('overdue',{n:-n})} · ${fShort(c.due)}</span>`;
+}
+function vDay(i,LD){
+  const r=resolve(i),open=ui.open===i;
+  const attn=!r.conf&&restDay(i)&&i<=TODAY;
+  const w=dow(i);
+  let cred='';
+  if(r.earn>0&&!r.hist)cred=`<span class="cred plus">+${num(r.earn)}</span>`;
+  else if(r.earn>0&&r.hist)cred=`<span class="cred plus" title="${t('hist')}">+${num(r.earn)}</span>`;
+  else if(r.use>0)cred=`<span class="cred minus">−${num(r.use)}</span>`;
+  const times=r.st==='work'||(r.inT&&r.outT&&r.inT!=='NA')?`${hmE(r.inT)} – ${hmE(r.outT)}`:'';
+  const rl=r.use>0?refLabel(LD,i):'';
+  const tags=(r.ph?`<span class="tag">${t('ph')}</span>`:'')+(r.rd?`<span class="tag">${t('repl')}</span>`:'');
+  let h=`<div class="day ${r.st==='off'?'off':''} ${attn?'attn':''} ${open?'open':''}" id="d-${i}">
+  <button class="dhead" data-act="open" data-d="${i}" aria-expanded="${open}">
+   <span class="dnum ${(w===0||w===6)?'we':''}">${+i.slice(8)}<small>${DOW[w]}</small></span>
+   <span class="dmain"><b>${esc(r.loc||t(r.st))}${tags}</b><i>${times}${r.note?(times?' · ':'')+esc(r.note):''}${rl?' · '+esc(rl):''}${LD.short[i]?' · <span class="warnline">'+t('noCredit')+'</span>':''}</i></span>${cred||'<span></span>'}</button>`;
+  if(open)h+=vEdit(i,r,LD);
+  return h+'</div>';
+}
+function vEdit(i,r,LD){
+  const rec=S.days[i]||{};const st=r.st;
+  const states=['work','off','comp','al','sick','travel','other'];
+  let f='';
+  if(st==='work'||st==='other'||st==='travel'||st==='sick')
+    f+=`<label class="f">${t('in')}<input type="time" data-f="in" data-d="${i}" value="${hm(r.inT&&r.inT!=='NA'?r.inT:'')}"></label><label class="f">${t('out')}<input type="time" data-f="out" data-d="${i}" value="${hm(r.outT&&r.outT!=='NA'?r.outT:'')}"></label>`;
+  f+=`<label class="f">${t('loc')}<input type="text" data-f="lbl" data-d="${i}" value="${esc(rec.lbl||'')}" placeholder="${esc(r.rec&&rec.lbl?'':r.loc)}"></label>`;
+  f+=`<label class="f">${t('cmt')}<input type="text" data-f="note" data-d="${i}" value="${esc(rec.note||'')}" placeholder="${esc(rec.note?'':r.note)}"></label>`;
+  let x='';
+  if(st==='work'&&restDay(i)||st==='comp'||st==='sick')x+=`<label class="ck"><input type="checkbox" data-f="half" data-d="${i}" ${rec.half?'checked':''}>${t('half')}</label>`;
+  if(st==='sick'||st==='travel'||st==='other')x+=`<label class="ck"><input type="checkbox" data-f="uc" data-d="${i}" ${rec.uc?'checked':''}>${t('uc')}</label>`;
+  let sel='';
+  if(r.use>0){
+    const opts=LD.cr.filter(c=>c.rem>0||c.d===rec.ref).slice(0,200);
+    sel=`<label class="f">${t('ref')}<select data-f="ref" data-d="${i}"><option value="">${t('auto')}</option>${opts.map(c=>`<option value="${c.d}" ${rec.ref===c.d?'selected':''}>${fRef(c.d)} · ${esc((c.why||'').slice(0,28))} · ${num(c.rem)}</option>`).join('')}</select></label>`;
+  }
+  let cov='';
+  if(st==='work'&&!r.hist)cov=`<label class="f">${t('creditOv')}<select data-f="cr" data-d="${i}"><option value="">${t('auto')}</option>${['0','0.5','1'].map(v=>`<option value="${v}" ${rec.cr!=null&&String(rec.cr)===v?'selected':''}>${v}</option>`).join('')}</select></label>`;
+  return `<div class="edit">
+   <div class="seg" role="group">${states.map(s=>`<button data-act="state" data-d="${i}" data-v="${s}" aria-pressed="${st===s}">${t(s)}</button>`).join('')}</div>
+   <div class="fields">${f}${sel}${cov}</div>
+   ${x?`<div class="row">${x}</div>`:''}
+   ${r.hist?`<div class="note">${t('hist')}</div>`:''}
+   <div class="row"><button class="btn pri sm" data-act="confirm" data-d="${i}">${t('confirm')}</button><button class="btn sm" data-act="resetday" data-d="${i}">${t('reset')}</button></div></div>`;
+}
+function vCycle(){
+  const c=ui.cyc?cycById(ui.cyc):currentCycle();ui.cyc=c.id;
+  const LD=ledger(),s=cycStats(c);
+  let h=`<div class="cyc-head"><button class="nav" data-act="cnav" data-v="-1" aria-label="${t('prev')}">‹</button>
+   <div class="mid"><div class="lbl">${cycNice(c)}</div>${dueChip(c)}</div>
+   <button class="nav" data-act="cnav" data-v="1" aria-label="${t('next')}">›</button></div>`;
+  const bal=c.end>S.cutoff?balAt(c.end<=TODAY?c.end:TODAY):null;
+  h+=`<div class="stats"><div><b>${s.w}</b><span>${t('worked')}</span></div><div><b>${s.rw}</b><span>${t('restwork')}</span></div>
+   <div><b>+${num(s.e)}</b><span>${t('earned')}</span></div><div><b>−${num(s.u)}</b><span>${t('used')}</span></div>
+   ${bal!==null?`<div class="bal ${bal<0?'neg':''}"><b>${num(bal)}</b><span>${t('balance')}</span></div>`:''}</div>`;
+  if(ui.send)return h+vSend(c);
+  if(s.att>0)h+=`<div class="banner"><span>${t('attn',{n:s.att})}</span><button class="btn sm" data-act="confirmall">${t('confirmAll')}</button></div>`;
+  h+=`<div class="days">${cycDays(c).map(i=>vDay(i,LD)).join('')}</div>`;
+  h+=`<div class="sendbar"><div class="in"><span class="note">${esc(subjectFor(c).replace(/ - Payroll.*/,''))}</span><button class="btn pri" data-act="send">${t('preview')}</button></div></div>`;
+  return h;
+}
+function vSend(c){
+  const st=S.settings;const sent=S.sent[c.id];
+  return `<div class="panel"><div class="row" style="justify-content:space-between"><button class="btn sm" data-act="unsend">‹ ${t('back')}</button>${sent?`<span class="chip ok">${t('sent')} ${fShort(sent.slice(0,10))}</span>`:''}</div>
+  <div class="fields"><label class="f" style="grid-column:1/-1">${t('to')}<input id="em-to" value="${esc(st.to)}"></label>
+  <label class="f" style="grid-column:1/-1">${t('cc')}<input id="em-cc" value="${esc(st.cc)}"></label>
+  <label class="f" style="grid-column:1/-1">${t('subject')}<input id="em-sub" value="${esc(subjectFor(c))}"></label></div>
+  <div class="prev" id="em-prev">${emailHtml(c,true)}</div>
+  <div class="row"><button class="btn pri" data-act="copyemail">${t('copyEmail')}</button><button class="btn" data-act="copytable">${t('copyTable')}</button><button class="btn" data-act="eml">${t('dlEml')}</button>
+  ${sent?`<button class="btn" data-act="unmark">${t('unmark')}</button>`:`<button class="btn" data-act="mark">${t('markSent')}</button>`}</div></div>`;
+}
+function vComp(){
+  const LD=ledger();const today=TODAY;
+  let h=`<div class="panel"><h2>${t('compBal')}</h2><div class="big ${LD.balance<0?'neg':''}" style="${LD.balance<0?'color:var(--red)':''}">${num(LD.balance)} <span class="note" style="font-size:16px">${t('days')}</span></div>
+  <div class="note">${t('openingNote',{d:fShort(S.cutoff)})}</div></div>`;
+  h+=`<div class="panel"><h2>${t('openCred')}</h2><div class="tw"><table class="t"><thead><tr><th>${t('earnedOn')}</th><th>${t('why')}</th><th>${t('left')}</th><th>${t('age')}</th><th></th></tr></thead><tbody>`+
+   LD.open.map(c=>{const poolIdx=c.id[0]==='p'?+c.id.slice(1):-1;return `<tr><td>${fRef(c.d)}</td><td>${esc(c.why||'')}</td><td>${num(c.rem)}</td><td>${Math.floor(diff(today,c.d)/30)} mo</td><td>${c.id[0]==='p'?`<button class="btn sm dng" data-act="delpool" data-v="${poolIdx}">${t('remove')}</button>`:''}</td></tr>`}).join('')+`</tbody></table></div></div>`;
+  const used=LD.deb.filter(x=>!x.adj);
+  const usedDays=Object.keys(LD.refs).sort();
+  h+=`<div class="panel"><h2>${t('usedLog')}</h2>${usedDays.length?`<div class="tw"><table class="t"><thead><tr><th>${t('usedOn')}</th><th>${t('creditUsed')}</th><th>${t('days')}</th></tr></thead><tbody>${usedDays.map(d=>LD.refs[d].map(x=>`<tr><td>${fRef(d)}</td><td>${fRef(x.cd)}</td><td>${num(x.v)}</td></tr>`).join('')).join('')}</tbody></table></div>`:'<div class="note">—</div>'}</div>`;
+  h+=`<div class="panel"><h2>${t('adj')}</h2><div class="fields"><label class="f">${t('adjDate')}<input type="date" id="adj-d" value="${TODAY}"></label><label class="f">${t('adjVal')}<input type="number" step="0.5" id="adj-v" value="1"></label><label class="f">${t('adjWhy')}<input id="adj-w"></label></div>
+  <div class="row"><button class="btn pri sm" data-act="addadj">${t('add')}</button></div>
+  ${S.adj.map((a,k)=>`<div class="row note">${fRef(a.d)} · ${a.v>0?'+':''}${a.v} · ${esc(a.why||'')} <button class="btn sm dng" data-act="deladj" data-v="${k}">${t('remove')}</button></div>`).join('')}</div>`;
+  return h;
+}
+function vCycles(){
+  const rows=[];let c=cycById(FIRST);const cur=currentCycle();
+  const last=nextCyc(cycleOf(TODAY));
+  while(c.start<=last.start){rows.push(c);c=nextCyc(c)}
+  rows.reverse();
+  return `<div class="tw"><table class="t"><thead><tr><th>${t('cycle')}</th><th>${t('status')}</th><th>${t('worked')}</th><th>${t('restwork')}</th><th>${t('earned')}</th><th>${t('used')}</th><th>${t('balance')}</th></tr></thead><tbody>`+
+  rows.map(c=>{const s=cycStats(c);const b=c.end>S.cutoff&&c.start<=TODAY?balAt(c.end<=TODAY?c.end:TODAY):null;
+   const stt=isSent(c)?t('sent'):c.start>TODAY?t('notYet'):t('due')+' '+fShort(c.due);
+   return `<tr class="clk" data-act="gocyc" data-v="${c.id}"><td>${cycNice(c)}</td><td>${stt}</td><td>${s.w}</td><td>${s.rw}</td><td>${s.e?'+'+num(s.e):'–'}</td><td>${s.u?'−'+num(s.u):'–'}</td><td>${b===null?'–':num(b)}</td></tr>`}).join('')+`</tbody></table></div>`;
+}
+function vHol(){
+  const years=[...new Set(Object.keys(S.holidays).map(d=>+d.slice(0,4)).concat([2026,2027]))].sort();
+  const list=Object.keys(S.holidays).filter(d=>+d.slice(0,4)===ui.year).sort();
+  const R=repl();const rev={};Object.keys(R).forEach(k=>{});
+  const replFor=h=>{const k=Object.keys(R).find(k=>R[k]===S.holidays[h]&&k>h&&diff(k,h)<8);return k};
+  return `<div class="note" style="margin-bottom:10px">${t('holNote')}</div>
+  <div class="seg" style="margin-bottom:12px">${years.map(y=>`<button data-act="year" data-v="${y}" aria-pressed="${ui.year===y}">${y}</button>`).join('')}</div>
+  ${S.prov.includes(ui.year)?`<div class="banner">${t('prov')}</div>`:''}
+  <div class="tw"><table class="t"><thead><tr><th>${t('date')}</th><th></th><th>${t('name')}</th><th>${t('replacement')}</th><th></th></tr></thead><tbody>`+
+  list.map(h=>{const r=isWk(h)?replFor(h):null;return `<tr><td>${fRef(h)}</td><td>${DOW[dow(h)]}</td><td>${esc(S.holidays[h])}</td><td>${r?DOW[dow(r)]+' '+fRef(r):'–'}</td><td><button class="btn sm dng" data-act="delhol" data-v="${h}">${t('remove')}</button></td></tr>`}).join('')+`</tbody></table></div>
+  <div class="panel" style="margin-top:14px"><div class="fields"><label class="f">${t('date')}<input type="date" id="h-d" value="${ui.year}-01-01"></label><label class="f">${t('name')}<input id="h-n"></label></div><div class="row"><button class="btn pri sm" data-act="addhol">${t('add')}</button></div></div>`;
+}
+function fld(id,label,val,type){return `<label class="f">${label}<input id="${id}" type="${type||'text'}" value="${esc(val)}"></label>`}
+function vSet(){
+  const s=S.settings;const bk=s.lastBackup?diff(TODAY,s.lastBackup.slice(0,10)):null;
+  return `<div class="panel"><div class="fields">${fld('s-name',t('sName'),s.name)}${fld('s-title',t('sTitle'),s.title)}${fld('s-from',t('sFrom'),s.from)}${fld('s-loc',t('sLoc'),s.loc)}${fld('s-in',t('sIn'),hm(s.in),'time')}${fld('s-out',t('sOut'),hm(s.out),'time')}
+  <label class="f">${t('sSat')}<select id="s-sat"><option value="work" ${s.sat==='work'?'selected':''}>${t('sSatW')}</option><option value="off" ${s.sat==='off'?'selected':''}>${t('sSatO')}</option></select></label></div>
+  <div class="fields"><label class="f" style="grid-column:1/-1">${t('sTo')}<input id="s-to" value="${esc(s.to)}"></label><label class="f" style="grid-column:1/-1">${t('sCc')}<input id="s-cc" value="${esc(s.cc)}"></label>
+  <label class="f" style="grid-column:1/-1">${t('sGreet')}<input id="s-greet" value="${esc(s.greet)}"></label><label class="f" style="grid-column:1/-1">${t('sSign')}<textarea id="s-sign" rows="8">${esc(s.sign)}</textarea></label></div>
+  <div class="row"><button class="btn pri" data-act="savesettings">${t('saved')}</button></div></div>
+  <div class="panel"><h2>${t('backup')}</h2>${bk===null||bk>30?`<div class="warnline">${t('backupOld',{n:bk===null?'∞':bk})}</div>`:''}
+  <div class="row"><button class="btn" data-act="exportjson">${t('exportJson')}</button><button class="btn" data-act="copyjson">${t('copyJson')}</button></div>
+  <label class="f">${t('restore')}<textarea id="rs-txt" rows="3"></textarea></label><div class="row"><button class="btn" data-act="restorejson">${t('restoreBtn')}</button></div></div>
+  <div class="panel"><h2>${t('cloud')}</h2><div class="fields">${fld('s-sync',t('cloudUrl'),s.sync)}${fld('s-key',t('cloudKey'),s.syncKey)}</div>
+  <div class="row"><button class="btn" data-act="cloudsave">${t('cloudPush')}</button><button class="btn" data-act="cloudload">${t('cloudPull')}</button></div></div>`;
+}
+function render(){
+  const a=document.activeElement&&document.activeElement.id;
+  const v={cycle:vCycle,comp:vComp,cycles:vCycles,hol:vHol,set:vSet}[ui.tab]();
+  $('#app').innerHTML=vHeader()+v;
+  if(a){const e=document.getElementById(a);if(e)e.focus()}
+  document.title='Iggy Timesheet';
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const a=b.dataset.act,v=b.dataset.v,d=b.dataset.d;
+  switch(a){
+   case'lang':lang=v;S.settings.lang=v;save();break;
+   case'tab':ui.tab=v;ui.send=false;render();break;
+   case'open':ui.open=ui.open===d?null:d;render();if(ui.open){const el=document.getElementById('d-'+d);el&&el.scrollIntoView({block:'nearest'})}break;
+   case'state':setState(d,v);break;
+   case'confirm':if(!S.days[d])S.days[d]={t:autoState(d)};ui.open=null;save();break;
+   case'resetday':delete S.days[d];save();break;
+   case'cnav':{const c=cycById(ui.cyc);ui.cyc=(v==='1'?nextCyc(c):prevCyc(c)).id;ui.open=null;ui.send=false;render();break}
+   case'confirmall':{const c=cycById(ui.cyc);cycDays(c).forEach(i=>{if(!S.days[i]&&i<=TODAY)S.days[i]={t:autoState(i)}});save();toast(t('saved'));break}
+   case'send':ui.send=true;render();window.scrollTo(0,0);break;
+   case'unsend':ui.send=false;render();break;
+   case'copyemail':{const c=cycById(ui.cyc);const ok=await copyRich(emailHtml(c,true),emailText(c,true));toast(ok?t('copied'):t('copyFail'));break}
+   case'copytable':{const c=cycById(ui.cyc);const ok=await copyRich(emailHtml(c,false),emailText(c,false));toast(ok?t('copied'):t('copyFail'));break}
+   case'eml':{const c=cycById(ui.cyc);const s=buildEml(c,$('#em-to').value,$('#em-cc').value,$('#em-sub').value);
+     if(!download(`Attendance_${c.id}.eml`,s,'message/rfc822'))toast(t('copyFail'));break}
+   case'mark':{const c=cycById(ui.cyc);cycDays(c).forEach(i=>{if(!S.days[i])S.days[i]={t:autoState(i)}});S.sent[c.id]=new Date().toISOString();save();toast(t('saved'));break}
+   case'unmark':delete S.sent[ui.cyc];save();break;
+   case'gocyc':ui.cyc=v;ui.tab='cycle';ui.send=false;render();break;
+   case'year':ui.year=+v;render();break;
+   case'delhol':delete S.holidays[v];save();break;
+   case'addhol':{const dd=$('#h-d').value,n=$('#h-n').value.trim();if(dd&&n){S.holidays[dd]=n;ui.year=+dd.slice(0,4);save()}break}
+   case'delpool':S.pool.splice(+v,1);save();break;
+   case'addadj':{const dd=$('#adj-d').value,vv=parseFloat($('#adj-v').value);if(dd&&vv&&dd>S.cutoff){S.adj.push({d:dd,v:vv,why:$('#adj-w').value});save()}break}
+   case'deladj':S.adj.splice(+v,1);save();break;
+   case'savesettings':{const s=S.settings;s.name=$('#s-name').value;s.title=$('#s-title').value;s.from=$('#s-from').value;s.loc=$('#s-loc').value;s.in=hmE($('#s-in').value)||s.in;s.out=hmE($('#s-out').value)||s.out;s.sat=$('#s-sat').value;s.to=$('#s-to').value;s.cc=$('#s-cc').value;s.greet=$('#s-greet').value;s.sign=$('#s-sign').value;save();toast(t('saved'));break}
+   case'exportjson':{S.settings.lastBackup=new Date().toISOString();persist();if(!download('timesheet-backup-'+TODAY+'.json',JSON.stringify(S),'application/json')){await navigator.clipboard.writeText(JSON.stringify(S)).catch(()=>{});toast(t('copied'))}render();break}
+   case'copyjson':{try{await navigator.clipboard.writeText(JSON.stringify(S));S.settings.lastBackup=new Date().toISOString();persist();toast(t('copied'))}catch(_){toast(t('copyFail'))}render();break}
+   case'restorejson':{try{const o=JSON.parse($('#rs-txt').value);if(o&&o.v){S=o;save();toast(t('saved'))}}catch(_){toast('JSON?')}break}
+   case'cloudsave':S.settings.sync=$('#s-sync').value.trim();S.settings.syncKey=$('#s-key').value.trim();persist();await cloudPush(false);break;
+   case'cloudload':S.settings.sync=$('#s-sync').value.trim();S.settings.syncKey=$('#s-key').value.trim();await cloudPull();break;
+  }
+});
+document.addEventListener('change',e=>{
+  const el=e.target;const f=el.dataset.f,d=el.dataset.d;if(!f||!d)return;
+  const cur=S.days[d]||{t:autoState(d)};const n={...cur};
+  if(f==='half'||f==='uc')n[f]=el.checked;
+  else if(f==='cr'){if(el.value==='')delete n.cr;else n.cr=parseFloat(el.value)}
+  else if(f==='ref'){if(el.value==='')delete n.ref;else n.ref=el.value}
+  else if(f==='in'||f==='out'){n[f]=hmE(el.value)}
+  else{if(el.value==='')delete n[f];else n[f]=el.value}
+  if(n.half===false)delete n.half;if(n.uc===false)delete n.uc;
+  S.days[d]=n;save();
+});
+
+/* ---------- boot ---------- */
+S=load();
+lang=S.settings.lang||'en';
+window.TS={get S(){return S},resolve,ledger,balAt,cycleOf,cycStats,emailRows,emailHtml,emailText,subjectFor,repl,currentCycle,cycLabel,buildEml,defaults,setState,render,ui};
+render();
+</script>
+</body></html>
